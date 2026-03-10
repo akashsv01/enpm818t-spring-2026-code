@@ -1,0 +1,222 @@
+@startuml university_full
+
+hide circle
+skinparam linetype ortho
+skinparam defaultFontName Arial
+skinparam nodesep 50
+skinparam ranksep 60
+skinparam padding 4
+!theme mono
+
+' ============================================================
+' PERSON cluster
+' ============================================================
+entity PERSON {
+  * <color:#9b59b6><b>person_id</b></color> : int <<PK>>
+  --
+  * first_name    : varchar
+    middle_name   : varchar
+  * last_name     : varchar
+  * date_of_birth : date
+  * street        : varchar
+  * city          : varchar
+  * state         : char(2)
+  * zip           : char(5)
+}
+
+entity PERSON_PHONE {
+  * <color:#9b59b6><b>person_id</b></color>    : int     <<PK, FK -> PERSON>>
+  * <color:#9b59b6><b>phone_number</b></color> : varchar <<PK>>
+}
+
+entity PERSON_EMAIL {
+  * <color:#9b59b6><b>person_id</b></color>     : int     <<PK, FK -> PERSON>>
+  * <color:#9b59b6><b>email_address</b></color> : varchar <<PK>>
+}
+
+' ============================================================
+' STUDENT hierarchy
+' ============================================================
+entity STUDENT {
+  * <color:#9b59b6><b>person_id</b></color> : int <<PK, FK -> PERSON>>
+  --
+  * student_id        : varchar <<UK>>
+  * admission_date    : date
+    gpa               : numeric
+  * academic_standing : varchar
+}
+
+entity STUDENT_DEGREE {
+  * <color:#9b59b6><b>person_id</b></color>  : int     <<PK, FK -> STUDENT>>
+  * <color:#9b59b6><b>degree_type</b></color>: varchar <<PK>>
+  * <color:#9b59b6><b>institution</b></color>: varchar <<PK>>
+  --
+    year : int
+}
+
+entity GRAD_STUDENT {
+  * <color:#9b59b6><b>person_id</b></color> : int <<PK, FK -> STUDENT>>
+  --
+    thesis_topic : varchar
+}
+
+' ============================================================
+' PROFESSOR hierarchy
+' ============================================================
+entity PROFESSOR {
+  * <color:#9b59b6><b>person_id</b></color>  : int     <<PK, FK -> PERSON>>
+  --
+  * professor_id : varchar <<UK>>
+    salary       : numeric
+  * hire_date    : date
+  * <color:#336791><b>dept_id</b></color>    : int     <<FK -> DEPARTMENT>>
+  * <color:#336791><b>rank_code</b></color>  : varchar <<FK -> ACADEMIC_RANK>>
+}
+
+entity PROF_SPECIALIZATION {
+  * <color:#9b59b6><b>person_id</b></color>     : int     <<PK, FK -> PROFESSOR>>
+  * <color:#9b59b6><b>specialization</b></color>: varchar <<PK>>
+}
+
+' ============================================================
+' DEPARTMENT + ACADEMIC_RANK
+' ============================================================
+entity DEPARTMENT {
+  * <color:#9b59b6><b>dept_id</b></color>  : int <<PK>>
+  --
+  * dept_name  : varchar <<UK>>
+    building   : varchar
+    budget     : numeric
+  .. chairs (1:1) ..
+  * <color:#336791><b>chair_id</b></color> : int  <<FK -> PROFESSOR, UK>>
+  * start_date : date
+}
+
+entity ACADEMIC_RANK {
+  * <color:#9b59b6><b>rank_code</b></color> : varchar <<PK>>
+  --
+  * rank_name  : varchar <<UK>>
+  * rank_order : int     <<UK>>
+}
+
+' ============================================================
+' COURSE cluster
+' ============================================================
+entity COURSE {
+  * <color:#9b59b6><b>course_id</b></color> : varchar <<PK>>
+  --
+  * title   : varchar
+  * credits : int
+    level   : varchar
+}
+
+entity COURSE_PREREQ {
+  * <color:#9b59b6><b>successor_id</b></color> : varchar <<PK, FK -> COURSE>>
+  * <color:#9b59b6><b>prereq_id</b></color>    : varchar <<PK, FK -> COURSE>>
+}
+
+entity COURSE_SECTION {
+  * <color:#9b59b6><b>course_id</b></color>  : varchar <<PK, FK -> COURSE>>
+  * <color:#9b59b6><b>section_no</b></color> : varchar <<PK (partial key)>>
+  --
+    semester  : varchar
+    year      : int
+    capacity  : int
+    schedule  : varchar
+}
+
+' ============================================================
+' ENROLLMENT + TA_ASSIGNMENT
+' ============================================================
+entity ENROLLMENT {
+  * <color:#9b59b6><b>student_person_id</b></color> : int     <<PK, FK -> STUDENT>>
+  * <color:#9b59b6><b>course_id</b></color>         : varchar <<PK, FK -> COURSE_SECTION>>
+  * <color:#9b59b6><b>section_no</b></color>        : varchar <<PK, FK -> COURSE_SECTION>>
+  --
+    grade       : varchar
+  * enroll_date : date
+}
+
+entity TA_ASSIGNMENT {
+  * <color:#9b59b6><b>course_id</b></color>          : varchar <<PK, FK -> COURSE_SECTION>>
+  * <color:#9b59b6><b>section_no</b></color>         : varchar <<PK, FK -> COURSE_SECTION>>
+  --
+  * <color:#336791><b>grad_person_id</b></color>      : int <<FK -> GRAD_STUDENT>>
+  * <color:#336791><b>professor_person_id</b></color> : int <<FK -> PROFESSOR>>
+}
+
+' ============================================================
+' VEHICLE OWNER category (union type)
+' ============================================================
+entity VEH_PERSON {
+  * <color:#9b59b6><b>ssn</b></color>  : varchar <<PK>>
+  --
+  * name : varchar
+}
+
+entity COMPANY {
+  * <color:#9b59b6><b>tax_id</b></color> : varchar <<PK>>
+  --
+  * company_name : varchar
+}
+
+entity BANK {
+  * <color:#9b59b6><b>routing_no</b></color> : varchar <<PK>>
+  --
+  * bank_name : varchar
+}
+
+entity VEHICLE_OWNER {
+  * <color:#9b59b6><b>owner_id</b></color>         : int     <<PK (surrogate)>>
+  --
+  * owner_type                                      : varchar <<CHECK: person/company/bank>>
+    <color:#336791><b>person_ssn</b></color>        : varchar <<FK -> VEH_PERSON>>
+    <color:#336791><b>company_tax_id</b></color>    : varchar <<FK -> COMPANY>>
+    <color:#336791><b>bank_routing_no</b></color>   : varchar <<FK -> BANK>>
+  * ownership_date                                  : date
+  --
+  {CHECK: exactly one FK is NOT NULL}
+}
+
+' ============================================================
+' Relationships
+' ============================================================
+
+' -- PERSON multivalued attributes
+PERSON       ||--o{ PERSON_PHONE        : "phone_numbers"
+PERSON       ||--o{ PERSON_EMAIL        : "email_addresses"
+
+' -- ISA: PERSON -> STUDENT -> GRAD_STUDENT
+PERSON       ||--o| STUDENT             : "ISA"
+STUDENT      ||--o{ STUDENT_DEGREE      : "previous_degrees"
+STUDENT      ||--o| GRAD_STUDENT        : "ISA"
+
+' -- ISA: PERSON -> PROFESSOR
+PERSON       ||--o| PROFESSOR           : "ISA"
+PROFESSOR    ||--o{ PROF_SPECIALIZATION : "specializations"
+
+' -- DEPARTMENT
+DEPARTMENT   ||--|{ PROFESSOR           : "employs"
+PROFESSOR    |o--|| DEPARTMENT          : "chairs"
+ACADEMIC_RANK ||--|{ PROFESSOR          : "has_rank"
+
+' -- COURSE
+COURSE       ||--|{ COURSE_SECTION      : "has_section"
+COURSE       ||--o{ COURSE_PREREQ       : "successor"
+COURSE       ||--o{ COURSE_PREREQ       : "prereq"
+
+' -- ENROLLMENT
+STUDENT      ||--o{ ENROLLMENT          : "enrolls_in"
+COURSE_SECTION ||--|{ ENROLLMENT        : "enrolls_in"
+
+' -- TA_ASSIGNMENT
+COURSE_SECTION ||--o| TA_ASSIGNMENT     : "has_ta"
+GRAD_STUDENT   ||--o{ TA_ASSIGNMENT     : "assigned_as_ta"
+PROFESSOR      ||--o{ TA_ASSIGNMENT     : "supervises"
+
+' -- VEHICLE OWNER category
+VEH_PERSON  ||--o| VEHICLE_OWNER        : "owner (person)"
+COMPANY     ||--o| VEHICLE_OWNER        : "owner (company)"
+BANK        ||--o| VEHICLE_OWNER        : "owner (bank)"
+
+@enduml
