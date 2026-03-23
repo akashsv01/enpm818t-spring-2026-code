@@ -30,7 +30,8 @@ CREATE TABLE person (
 
 CREATE TABLE department (
     dept_id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    dept_name VARCHAR(100) NOT NULL UNIQUE
+    dept_name VARCHAR(100) NOT NULL UNIQUE,
+    chair_id  INTEGER UNIQUE          -- FK added after professor is created (circular dep)
 );
 
 CREATE TABLE student (
@@ -57,6 +58,13 @@ CREATE TABLE professor (
     CONSTRAINT chk_rank
         CHECK (rank_code IN ('Assistant', 'Associate', 'Full'))
 );
+
+-- Resolve circular dependency: department.chair_id -> professor.person_id
+ALTER TABLE department
+    ADD CONSTRAINT fk_dept_chair
+        FOREIGN KEY (chair_id)
+            REFERENCES professor (person_id)
+            ON DELETE SET NULL;
 
 CREATE TABLE grad_student (
     person_id  INTEGER PRIMARY KEY
@@ -153,6 +161,11 @@ INSERT INTO professor VALUES (6, 2, '2015-01-10', 'Full');
 INSERT INTO professor VALUES (7, 1, '2019-01-15', 'Associate');
 INSERT INTO professor VALUES (8, 3, '2022-08-01', 'Assistant');
 INSERT INTO professor VALUES (9, 4, '2021-03-20', 'Associate');
+
+-- Department chairs (professor chairs 0 or 1 department)
+UPDATE department SET chair_id = 3 WHERE dept_id = 1;  -- Carol chairs CS
+UPDATE department SET chair_id = 6 WHERE dept_id = 2;  -- Frank chairs Math
+-- Mech Eng and EE have no chair (chair_id stays NULL)
 
 -- Enrollments
 INSERT INTO enrollment VALUES (1, 'ENPM818T', '0101', 'A');
