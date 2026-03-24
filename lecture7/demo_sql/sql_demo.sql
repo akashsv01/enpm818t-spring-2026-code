@@ -173,11 +173,11 @@ CREATE TABLE on_call (
 
 -- ============================================================
 -- SEED DATA
--- person_id=1 is intentionally left free for Demo 1 (Alice).
--- Persons 2-10 are forced with OVERRIDING SYSTEM VALUE so
--- all FK references (professors, chairs) keep their expected ids.
--- setval() advances the sequence so the next organic INSERT
--- (Alice in Demo 1) receives person_id=1.
+-- All 10 persons are seeded normally (identity sequence assigns
+-- ids 1-10 in insertion order).
+-- Alice = person_id=1, Zara = person_id=10 (demo/throwaway).
+-- David(4) is intentionally NOT enrolled in ENPM818T -- that
+-- slot is used for the Demo 6 COMMIT happy path.
 -- ============================================================
 BEGIN;
 
@@ -203,30 +203,21 @@ INSERT INTO course_section VALUES ('ENPM605',  '0101', 30);
 INSERT INTO course_section VALUES ('ENPM702',  '0101', 30);
 INSERT INTO course_section VALUES ('ENPM818T', '0101', 30);
 
--- Persons 2-10 seeded with explicit IDs; person_id=1 reserved for Alice.
-INSERT INTO person (person_id, first_name, last_name, date_of_birth)
-    OVERRIDING SYSTEM VALUE
-    VALUES (2,  'Bob',    'Smith',    '1999-07-22'),  -- student
-           (3,  'Carol',  'Davis',    '1980-03-15'),  -- professor
-           (4,  'David',  'Lee',      '2000-11-30'),  -- student
-           (5,  'Eve',    'Brown',    '2001-01-10'),  -- student
-           (6,  'Frank',  'Wilson',   '1975-06-05'),  -- professor
-           (7,  'Grace',  'Taylor',   '1982-09-20'),  -- professor
-           (8,  'Hank',   'Anderson', '1990-12-01'),  -- professor
-           (9,  'Irene',  'Thomas',   '1985-04-18'),  -- professor
-           (10, 'Zara',   'Patel',    '2002-05-14');  -- demo/throwaway
+-- Persons 1-10 inserted in order; identity sequence assigns ids 1-10.
+INSERT INTO person (first_name, last_name, date_of_birth)
+    VALUES ('Alice',  'Johnson',  '1998-04-12'),  -- 1  student
+           ('Bob',    'Smith',    '1999-07-22'),  -- 2  student
+           ('Carol',  'Davis',    '1980-03-15'),  -- 3  professor
+           ('David',  'Lee',      '2000-11-30'),  -- 4  student
+           ('Eve',    'Brown',    '2001-01-10'),  -- 5  student
+           ('Frank',  'Wilson',   '1975-06-05'),  -- 6  professor
+           ('Grace',  'Taylor',   '1982-09-20'),  -- 7  professor
+           ('Hank',   'Anderson', '1990-12-01'),  -- 8  professor
+           ('Irene',  'Thomas',   '1985-04-18'),  -- 9  professor
+           ('Zara',   'Patel',    '2002-05-14');  -- 10 demo/throwaway
 
--- Advance the identity sequence so the next INSERT gets person_id=1.
--- (The gap at 1 is below the current max, so GENERATED ALWAYS will
--- assign 1 on the very next INSERT because the sequence restarts
--- from the lowest unused value below the max when we use setval.)
--- Actually with GENERATED ALWAYS AS IDENTITY the sequence only goes
--- forward. We must set it to 0 so next value is 1.
-SELECT setval(pg_get_serial_sequence('person', 'person_id'), 0);
--- Now the next INSERT INTO person ... (without OVERRIDING) gets id=1.
-
--- Students: 2, 4, 5 only. Alice (id=1) added live in Demo 1.
--- David(4) intentionally NOT in ENPM818T -- slot used for Demo 6 COMMIT.
+-- Students: 1, 2, 4, 5.
+INSERT INTO student VALUES (1, '117453210', '2024-08-26', 'Good Standing', 3.75);
 INSERT INTO student VALUES (2, '117453211', '2024-08-26', 'Good Standing', 1.85);
 INSERT INTO student VALUES (4, '117453213', '2023-08-28', 'Good Standing', 3.20);
 INSERT INTO student VALUES (5, '117453214', '2023-08-28', 'Good Standing', 1.92);
@@ -240,8 +231,10 @@ INSERT INTO professor VALUES (9, 4, '2021-03-20', 'Associate');
 UPDATE department SET chair_id = 3 WHERE dept_id = 1;
 UPDATE department SET chair_id = 6 WHERE dept_id = 2;
 
--- Enrollments: no Alice rows (she has no student row yet).
+-- Seed enrollments. David(4) intentionally NOT in ENPM818T (used for Demo 6).
+INSERT INTO enrollment VALUES (1, 'ENPM818T', '0101', 'A');
 INSERT INTO enrollment VALUES (2, 'ENPM818T', '0101', 'B+');
+INSERT INTO enrollment VALUES (1, 'ENPM605',  '0101', 'A-');
 INSERT INTO enrollment VALUES (4, 'ENPM702',  '0101', 'B');
 INSERT INTO enrollment VALUES (5, 'ENPM818T', '0101', 'A');
 
@@ -255,7 +248,7 @@ UNION ALL SELECT 'student',    count(*) FROM student
 UNION ALL SELECT 'professor',  count(*) FROM professor
 UNION ALL SELECT 'course',     count(*) FROM course
 UNION ALL SELECT 'enrollment', count(*) FROM enrollment;
--- Expected: person=9, student=3, professor=5, course=4, enrollment=3
+-- Expected: person=10, student=4, professor=5, course=4, enrollment=5
 
 
 -- ============================================================
@@ -338,12 +331,12 @@ DELETE FROM department
 
 -- BAD approach 1: guess the identity value
 -- INSERT INTO student (person_id, student_id, admission_date, academic_standing)
---     VALUES (1, '117453210', '2024-08-26', 'Good Standing');
+--     VALUES (11, '117453230', '2025-08-25', 'Good Standing');
 -- Risk: breaks silently if another session inserted a row at the same time.
 
 -- BAD approach 2: SELECT MAX() after INSERT
 -- INSERT INTO person (first_name, last_name, date_of_birth)
---     VALUES ('Alice', 'Johnson', '1998-04-12');
+--     VALUES ('Lena', 'Park', '2003-06-20');
 -- SELECT MAX(person_id) FROM person;
 -- Risk: another session may insert between your INSERT and SELECT,
 -- returning the wrong ID. Never use this pattern.
@@ -351,39 +344,47 @@ DELETE FROM department
 
 -- ============================================================
 -- DEMO 1 -- INSERT ... RETURNING: ISA chain
--- Slide: demostep{1}
--- Alice does NOT exist yet. person_id=1 is free (see seed notes).
--- State entering: person ids 2-10; student has 2,4,5 only.
+-- The slide uses "Alice" as the example name. In the live demo
+-- we use "Lena" because Alice already exists in the database
+-- with a full student record from the seed. The mechanism
+-- demonstrated is identical -- RETURNING captures the
+-- engine-assigned PK atomically. Mention this to students.
+-- State entering: person=10, student=4 (1,2,4,5)
 -- ============================================================
 
--- The slide's exact demo:
--- Insert Alice into person and capture the generated PK atomically.
+-- Warm-up: single-row and multi-row INSERT (shown on INSERT slide
+-- before demostep{1}).
+INSERT INTO department (dept_name) VALUES ('Philosophy');
+INSERT INTO department (dept_name)
+    VALUES ('Linguistics'), ('History'), ('Sociology'), ('Art History');
+SELECT dept_id, dept_name FROM department ORDER BY dept_id;
+DELETE FROM department
+    WHERE dept_name IN
+        ('Philosophy', 'Linguistics', 'History', 'Sociology', 'Art History');
+
+-- The RETURNING demo: insert Lena into person and capture the PK.
 INSERT INTO person (first_name, last_name, date_of_birth)
-    VALUES ('Alice', 'Johnson', '1998-04-12')
+    VALUES ('Lena', 'Park', '2003-06-20')
     RETURNING person_id;
--- Returns person_id = 1.
+-- Returns person_id = 11 (sequence continues from 10).
 
 -- Use the returned value to insert the student row.
 INSERT INTO student (person_id, student_id, admission_date, academic_standing)
-    VALUES (1, '117453210', '2024-08-26', 'Good Standing');
+    VALUES (11, '117453230', '2025-08-25', 'Good Standing');
 
 -- Verify
-SELECT * FROM student WHERE person_id = 1;
+SELECT * FROM student WHERE person_id = 11;
 
 -- FK violation: person_id 99 does not exist.
 INSERT INTO student (person_id, student_id, admission_date, academic_standing)
     VALUES (99, '117453299', '2025-08-25', 'Good Standing');
 -- ERROR: violates foreign key constraint
 
--- Add Alice's enrollments to establish the full seed state
--- used by all subsequent demos.
-INSERT INTO enrollment VALUES (1, 'ENPM818T', '0101', 'A');
-INSERT INTO enrollment VALUES (1, 'ENPM605',  '0101', 'A-');
+-- Cleanup Lena -- not needed in subsequent demos.
+DELETE FROM person WHERE person_id = 11;
+-- (CASCADE removes the student row automatically.)
 
--- State after Demo 1:
---   Alice (person_id=1) in person, student, and enrollment
---   Full enrollment state: (1,ENPM818T), (1,ENPM605),
---                          (2,ENPM818T), (4,ENPM702), (5,ENPM818T)
+-- State after Demo 1: person=10, student=4 (1,2,4,5) -- back to seed.
 
 
 -- ============================================================
@@ -619,17 +620,12 @@ DELETE FROM student WHERE person_id = 10;
 SELECT * FROM student     WHERE person_id = 10; -- 0 rows
 SELECT * FROM enrollment  WHERE student_person_id = 10; -- 0 rows
 
--- For the RETURNING variant: re-insert Zara and capture before deleting.
-INSERT INTO person (person_id, first_name, last_name, date_of_birth)
-    OVERRIDING SYSTEM VALUE
-    VALUES (10, 'Zara', 'Patel', '2002-05-14')
-    ON CONFLICT DO NOTHING;
+-- For the RETURNING variant: Zara(10) is in person from the seed
+-- but NOT in student. Insert her as student to demonstrate DELETE ... RETURNING.
 INSERT INTO student (person_id, student_id, admission_date, academic_standing)
     VALUES (10, '117453220', '2025-08-25', 'Good Standing');
 INSERT INTO enrollment VALUES (10, 'ENPM818T', '0101', NULL);
-INSERT INTO enrollment VALUES (10, 'ENPM605',  '0101', NULL);
 
--- Capture enrollment rows for audit before cascade removes them.
 DELETE FROM enrollment
     WHERE student_person_id = 10
     RETURNING student_person_id, course_id, grade;
