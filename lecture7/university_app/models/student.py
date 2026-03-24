@@ -1,3 +1,9 @@
+"""
+university_app/models/student.py
+Pure data container. No database calls.
+Field names match student table column names exactly.
+"""
+
 from dataclasses import dataclass
 from datetime import date
 
@@ -12,11 +18,4 @@ class Student:
 
     @classmethod
     def from_row(cls, row: dict) -> "Student":
-        """Create a Student from a dict row returned by psycopg3."""
-        return cls(
-            person_id=row["person_id"],
-            student_id=row["student_id"],
-            admission_date=row["admission_date"],
-            academic_standing=row["academic_standing"],
-            gpa=float(row["gpa"]) if row.get("gpa") is not None else None,
-        )
+        return cls(**row)

@@ -1,3 +1,9 @@
+"""
+university_app/models/person.py
+Pure data container. No database calls.
+Field names match person table column names exactly.
+"""
+
 from dataclasses import dataclass
 from datetime import date
 
@@ -11,10 +17,4 @@ class Person:
 
     @classmethod
     def from_row(cls, row: dict) -> "Person":
-        """Create a Person from a dict row returned by psycopg3."""
-        return cls(
-            person_id=row["person_id"],
-            first_name=row["first_name"],
-            last_name=row["last_name"],
-            date_of_birth=row.get("date_of_birth"),
-        )
+        return cls(**row)

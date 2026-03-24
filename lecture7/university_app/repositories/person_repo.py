@@ -1,3 +1,9 @@
+"""
+university_app/repositories/person_repo.py
+Rules: no business logic, no user I/O.
+Each method runs exactly one query and returns the result.
+"""
+
 from psycopg.rows import dict_row
 
 from config.database import DatabaseConfig
@@ -6,29 +12,37 @@ from models.person import Person
 
 class PersonRepository:
 
-    def find_by_id(self, person_id: int) -> Person | None:
+    def find_by_id(self, person_id: int) -> dict | None:
         with DatabaseConfig.get_connection() as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
-                    "SELECT * FROM person WHERE person_id = %s",
+                    "SELECT person_id, first_name, last_name, date_of_birth "
+                    "FROM person "
+                    "WHERE person_id = %s",
                     (person_id,),
                 )
-                row = cur.fetchone()
-                return Person.from_row(row) if row else None
+                return cur.fetchone()
 
-    def find_all(self, limit: int = 20, offset: int = 0) -> list[Person]:
+    def find_all(self) -> list[dict]:
         with DatabaseConfig.get_connection() as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
-                    "SELECT * FROM person ORDER BY person_id "
-                    "LIMIT %s OFFSET %s",
-                    (limit, offset),
+                    "SELECT person_id, first_name, last_name, date_of_birth "
+                    "FROM person "
+                    "ORDER BY person_id"
                 )
-                return [Person.from_row(row) for row in cur.fetchall()]
+                return cur.fetchall()
 
-    def create(self, first_name: str, last_name: str,
-               date_of_birth: str | None = None) -> int:
-        """Insert a person and return the generated person_id."""
+    def create(
+        self,
+        first_name: str,
+        last_name: str,
+        date_of_birth: str | None,
+    ) -> int:
+        """
+        Insert a new person row and return the generated person_id.
+        Uses RETURNING to capture the identity value atomically.
+        """
         with DatabaseConfig.get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
